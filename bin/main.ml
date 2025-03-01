@@ -5,11 +5,7 @@ module Map = Map.Make(String)
 type value =
   | VInt of int
   | VBool of bool
-
-let string_of_value v = 
-  match v with
-  | VInt i -> Printf.sprintf "VInt{%d}" i
-  | VBool i -> Printf.sprintf "VBool{%b}" i
+  [@@deriving show { with_path = false }]
 
 type expr =
   | EVar of string
@@ -17,34 +13,19 @@ type expr =
   | EAbs of { param : string; body : expr }
   | EApp of { func : expr; arg : expr }
   | ELet of { var : string; init : expr; body : expr } 
-
-let rec string_of_expr e =
-  match e with
-  | EVar i -> i
-  | EValue i -> Printf.sprintf "EValue{%s}" (string_of_value i)
-  | EAbs { param; body } -> Printf.sprintf "EAbs{%s, %s}" param (string_of_expr body)
-  | EApp { func; arg } -> Printf.sprintf "EApp{%s, %s}" (string_of_expr func) (string_of_expr arg)
-  | ELet { var; init; body } -> Printf.sprintf "ELet{%s, %s, %s}" var (string_of_expr init) (string_of_expr body)
+  [@@deriving show { with_path = false }]
 
 type ttype =
   | TVar of string
   | TInt
   | TBool
   | TAbs of { arg : ttype; body : ttype }
+  [@@deriving show { with_path = false }]
 
-let rec string_of_ttype t =
-  match t with
-  | TVar i -> Printf.sprintf "%s" i
-  | TInt -> "int"
-  | TBool -> "bool"
-  | TAbs { arg; body } -> Printf.sprintf "%s -> %s" (string_of_ttype arg) (string_of_ttype body)
-
-type scheme = Scheme of { vars : string list; typ : ttype }
+type scheme = Scheme of { vars : string list; typ : ttype } [@@deriving show { with_path = false }]
 
 type subst = ttype Map.t
 type ctx = scheme Map.t
-
-let string_of_scheme (Scheme { vars; typ }) = Printf.sprintf "Scheme{[%s]:%s}" (String.concat "," vars) (string_of_ttype typ)
 
 let rec ftv_ttype ttype = 
   match ttype with
@@ -87,8 +68,8 @@ module type UNIFY = sig
   val mgu : ttype -> ttype -> subst
 end
 module Unify : UNIFY = struct
-  let unify_error t1 t2 = Printf.sprintf "Unable to unify %s and %s." (string_of_ttype t1) (string_of_ttype t2)
-  let hole_error var expected = Printf.sprintf "Found hole %s : %s." var (string_of_ttype expected) 
+  let unify_error t1 t2 = Printf.sprintf "Unable to unify %s and %s." (show_ttype t1) (show_ttype t2)
+  let hole_error var expected = Printf.sprintf "Found hole %s : %s." var (show_ttype expected) 
   
   let is_hole = function
     | TVar u when String.starts_with ~prefix:"_" u -> true
@@ -120,7 +101,10 @@ module Unify : UNIFY = struct
       | (_, _) -> failwith (unify_error t1 t2)
 end
 
-module Counter = struct
+module type COUNTER = sig
+  val newVar : unit -> ttype
+end
+module Counter : COUNTER = struct
   let r = ref 0
 
   let newVar () = 
@@ -169,7 +153,7 @@ let f = EAbs {
     param = "x";
     body = EAbs {
       param = "y";
-      body = EValue (VInt 10)
+      body = EVar "_a" (*EValue (VInt 10)*)
     }
   }
 let code = 
@@ -185,10 +169,10 @@ let code =
 let () = 
   try
     let (s, typ) = infer Map.empty code in
-    Printf.printf "Original type: %s\n" (string_of_ttype typ);
+    Printf.printf "Original type: %s\n" (show_ttype typ);
     print_endline "Substitutions: ";
-    Map.iter (fun k v -> print_endline (Printf.sprintf "Substitution: %s:%s" k (string_of_ttype v))) s;
+    Map.iter (fun k v -> print_endline (Printf.sprintf "Substitution: %s:%s" k (show_ttype v))) s;
     print_endline "Check with test: ";
-    Printf.printf "Resulting type: %s\n" (string_of_ttype (subst_ttype s typ))
+    Printf.printf "Resulting type: %s\n" (show_ttype (subst_ttype s typ))
   with
   | Failure s -> print_endline s

@@ -1,7 +1,6 @@
-(executable
- (public_name algo_w)
- (name main)
- (libraries syntax)
+(library
+ (name syntax)
+ (libraries)
  (preprocess
   (pps ppx_deriving.show)))
 
